@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DN42 ISP Explorer</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --bg-color: #f8f9fa;
+            --sidebar-bg: #ffffff;
+            --border-color: #dee2e6;
+            --text-color: #333;
+            --header-bg: #2c3e50;
+            --header-text: #fff;
+            --success-color: #28a745;
+            --secondary-text: #6c757d;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        header {
+            background-color: var(--header-bg);
+            color: var(--header-text);
+            padding: 0.8rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 { margin: 0; font-size: 1.2rem; }
+
+        /* Main Layout */
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 360px;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        /* Search Box */
+        .search-container {
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+            background: #fdfdfd;
+        }
+        .search-box {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        .search-box:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.9rem;
+            background: #f1f1f1;
+            transition: background 0.2s;
+        }
+
+        .tab.active {
+            background: #fff;
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        .isp-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 0 10px 0;
+        }
+
+        /* Collapsible Category */
+        .category-group {
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .category-header {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: var(--secondary-text);
+            padding: 12px 15px;
+            font-weight: bold;
+            background: #fafafa;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+        
+        .category-header:hover { background: #eee; }
+        
+        .category-header::after {
+            content: '▼';
+            font-size: 0.7rem;
+            transition: transform 0.2s;
+        }
+        
+        .category-group.collapsed .category-header::after {
+            transform: rotate(-90deg);
+        }
+        
+        .category-items {
+            display: block;
+        }
+        
+        .category-group.collapsed .category-items {
+            display: none;
+        }
+
+        /* ISP Item */
+        .isp-item {
+            padding: 10px 15px;
+            border-bottom: 1px solid #f8f9fa;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .isp-item:hover { background-color: #e9ecef; }
+        .isp-item.selected {
+            background-color: #e7f1ff;
+            border-left: 4px solid var(--primary-color);
+            padding-left: 11px; /* compensate border */
+        }
+
+        .isp-info { display: flex; flex-direction: column; gap: 2px; }
+        .isp-name { font-weight: 500; font-size: 0.95rem; }
+        .isp-asn { font-size: 0.8rem; color: #666; background: #eee; padding: 2px 5px; border-radius: 4px; font-family: monospace; }
+        .isp-centrality { font-size: 0.75rem; color: #999; }
+
+        /* Content Area */
+        .content {
+            flex: 1;
+            padding: 25px;
+            overflow-y: auto;
+            background-color: #fff;
+        }
+
+        .empty-state { text-align: center; color: #888; margin-top: 100px; }
+
+        /* Detail Styling */
+        .detail-header {
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .detail-header h2 { margin: 0 0 5px 0; color: var(--primary-color); }
+        .detail-header .meta { font-size: 0.85rem; color: #666; }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        th, td {
+            text-align: left;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        th { background-color: #f8f9fa; font-weight: 600; color: #555; }
+        tr:hover td { background-color: #fafafa; }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 3px 6px;
+            font-size: 0.75rem;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .badge-visible { background-color: #d4edda; color: #155724; }
+        .badge-hidden { background-color: #e2e3e5; color: #383d41; }
+
+        /* Info Grid */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        .info-card {
+            background: #f9f9f9;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #eee;
+        }
+        .info-label { font-weight: bold; font-size: 0.75rem; color: #666; text-transform: uppercase; margin-bottom: 4px; }
+        .info-value { word-break: break-all; font-size: 0.95rem; }
+
+        /* PGP Collapsible */
+        .pgp-container { cursor: pointer; color: var(--primary-color); }
+        .pgp-container:hover { text-decoration: underline; }
+        .pgp-full { display: none; white-space: pre-wrap; word-break: break-all; color: var(--text-color); cursor: text; margin-top: 5px; font-family: monospace; font-size: 0.85rem; background: #eee; padding: 5px; border-radius: 4px;}
+        .pgp-container.expanded .pgp-short { display: none; }
+        .pgp-container.expanded .pgp-full { display: block; text-decoration: none; }
+
+        /* Loader */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<header>
+    <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:1.5rem;">🌐</span>
+        <h1>DN42 ISP Explorer</h1>
+    </div>
+    <div id="status-bar" style="font-size: 0.8rem; opacity: 0.8;">Ready</div>
+</header>
+
+<div class="container">
+    <!-- Left Sidebar -->
+    <div class="sidebar">
+        <div class="search-container">
+            <input type="text" id="search-input" class="search-box" placeholder="Search by Name or ASN...">
+        </div>
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('v4')">IPv4</div>
+            <div class="tab" onclick="switchTab('v6')">IPv6</div>
+        </div>
+        <div class="isp-list" id="isp-list-container">
+            <div class="loader"></div>
+        </div>
+    </div>
+
+    <!-- Right Content -->
+    <div class="content" id="detail-container">
+        <div class="empty-state">
+            <h3>Select an ISP to view details</h3>
+            <p style="color:#aaa;">Data Source: bgp-data.strexp.net</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    const URL_V4 = 'https://bgp-data.strexp.net/isp/isp4.json';
+    const URL_V6 = 'https://bgp-data.strexp.net/isp/isp6.json';
+    const URL_DETAIL_BASE = 'https://bgp-data.strexp.net/asn/AS'; 
+
+    let appState = {
+        v4Data: null,
+        v6Data: null,
+        mode: 'v4',       // 'v4' or 'v6'
+        currentAsn: null,
+        filterText: '',
+        collapsed: {}     // Stores format: { "Tier 1 Operators": true/false }
+    };
+
+    const els = {
+        list: document.getElementById('isp-list-container'),
+        detail: document.getElementById('detail-container'),
+        status: document.getElementById('status-bar'),
+        search: document.getElementById('search-input'),
+        tabs: document.querySelectorAll('.tab')
+    };
+
+    // --- Init ---
+    document.addEventListener('DOMContentLoaded', () => {
+        loadList();
+        
+        // Search Listener
+        els.search.addEventListener('input', (e) => {
+            appState.filterText = e.target.value.trim().toLowerCase();
+            renderList();
+        });
+    });
+
+    function findCategoryName(dataSet, targetAsn) {
+        if (!dataSet) return null;
+        for (const cat of dataSet) {
+            if (cat.data.some(item => String(item.asn) === String(targetAsn))) {
+                return cat.name;
+            }
+        }
+        return null;
+    }
+    
+    // --- Data Loading ---
+    async function loadList() {
+        els.status.textContent = "Loading lists...";
+        try {
+            const [v4, v6] = await Promise.all([
+                fetch(URL_V4).then(r => r.json()),
+                fetch(URL_V6).then(r => r.json())
+            ]);
+            appState.v4Data = v4;
+            appState.v6Data = v6;
+            els.status.textContent = "Lists loaded";
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            const targetAsn = urlParams.get('asn');
+
+            if (targetAsn) {
+                let category = findCategoryName(v4, targetAsn);
+                if (category) {
+                    appState.mode = 'v4';
+                } else {
+                    category = findCategoryName(v6, targetAsn);
+                    if (category) {
+                        appState.mode = 'v6';
+                    }
+                }
+
+                appState.currentAsn = targetAsn; // 保存选中的 ASN
+                if (category) {
+                    appState.collapsed[category] = false; // 确保该分类是展开的
+                }
+
+                els.tabs.forEach(t => {
+                    t.classList.toggle('active', t.textContent.toLowerCase().includes(appState.mode));
+                });
+
+                loadDetail(targetAsn);
+            }
+            
+            renderList();
+            
+            if (targetAsn) {
+                setTimeout(() => {
+                    const selectedEl = document.querySelector('.isp-item.selected');
+                    if (selectedEl) selectedEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                }, 100);
+            }
+        } catch (e) {
+            console.error(e);
+            els.list.innerHTML = `<div style="padding:15px; color:red">Failed to load data.<br>${e.message}</div>`;
+            els.status.textContent = "Network Error";
+        }
+    }
+
+    async function loadDetail(asn) {
+        els.detail.innerHTML = '<div class="loader"></div><p style="text-align:center; color:#666;">Fetching ISP info...</p>';
+        els.status.textContent = `Fetching AS${asn}...`;
+        
+        try {
+            const res = await fetch(`${URL_DETAIL_BASE}${asn}.json`);
+            if(!res.ok) throw new Error("ASN not found or API error");
+            const data = await res.json();
+            renderDetail(data);
+            els.status.textContent = `AS${asn} Displayed`;
+        } catch (e) {
+            els.detail.innerHTML = `
+                <div class="empty-state">
+                    <h3>Error</h3>
+                    <p>${e.message}</p>
+                </div>`;
+            els.status.textContent = "Error";
+        }
+    }
+
+    // --- Sidebar Rendering ---
+    function switchTab(mode) {
+        appState.mode = mode;
+        // Reset collapse state on tab switch? Optional. Let's keep it per view.
+        // Update UI
+        els.tabs.forEach(t => {
+            t.classList.toggle('active', t.textContent.toLowerCase().includes(mode));
+        });
+        renderList();
+    }
+
+    function renderList() {
+        els.list.innerHTML = "";
+        const rawData = appState.mode === 'v4' ? appState.v4Data : appState.v6Data;
+        
+        if (!rawData) return;
+
+        let hasResults = false;
+
+        rawData.forEach(cat => {
+            // Filter items inside category
+            const filteredItems = cat.data.filter(item => {
+                if (!appState.filterText) return true;
+                return item.name.toLowerCase().includes(appState.filterText) || 
+                       String(item.asn).includes(appState.filterText);
+            });
+
+            if (filteredItems.length === 0) return; // Skip empty categories
+            hasResults = true;
+
+            // Container Group
+            const group = document.createElement('div');
+            group.className = 'category-group';
+            
+            // If searching, always expand. If not, use saved state.
+            const isCollapsed = appState.filterText ? false : !!appState.collapsed[cat.name];
+            if (isCollapsed) group.classList.add('collapsed');
+
+            // Header
+            const header = document.createElement('div');
+            header.className = 'category-header';
+            header.innerHTML = `<span>${cat.name} <small style="font-weight:normal; opacity:0.7">(${filteredItems.length})</small></span>`;
+            header.title = cat.desc;
+            header.onclick = () => {
+                // Toggle Collapse State
+                if (appState.filterText) return; // Disable collapsing during search
+                appState.collapsed[cat.name] = !appState.collapsed[cat.name];
+                group.classList.toggle('collapsed');
+            };
+            group.appendChild(header);
+
+            // Items Container
+            const itemsContainer = document.createElement('div');
+            itemsContainer.className = 'category-items';
+
+            filteredItems.forEach(isp => {
+                const el = document.createElement('div');
+                el.className = 'isp-item';
+                if (appState.currentAsn === isp.asn) el.classList.add('selected');
+                
+                el.innerHTML = `
+                    <div class="isp-info">
+                        <span class="isp-name">${highlight(isp.name, appState.filterText)}</span>
+                        <span class="isp-centrality">Centrality: ${isp.centrality}</span>
+                    </div>
+                    <span class="isp-asn">AS${highlight(String(isp.asn), appState.filterText)}</span>
+                `;
+                el.onclick = () => {
+                    document.querySelectorAll('.isp-item').forEach(i => i.classList.remove('selected'));
+                    el.classList.add('selected');
+                    appState.currentAsn = isp.asn;
+                    loadDetail(isp.asn);
+                    window.history.pushState({}, document.title, window.location.pathname);
+                };
+                itemsContainer.appendChild(el);
+            });
+
+            group.appendChild(itemsContainer);
+            els.list.appendChild(group);
+        });
+
+        if (!hasResults) {
+            els.list.innerHTML = '<div style="padding:20px; text-align:center; color:#999">No results found.</div>';
+        }
+    }
+
+    // Helper: Highlight search term
+    function highlight(text, term) {
+        if (!term) return text;
+        const reg = new RegExp(`(${term})`, 'gi');
+        return text.replace(reg, '<mark style="background:#fff3cd; padding:0">$1</mark>');
+    }
+
+    // --- Detail Rendering ---
+    function safeJoin(val) {
+        if (!val) return "";
+        return Array.isArray(val) ? val.join(", ") : val;
+    }
+
+    function renderDetail(data) {
+        const asn = data.asn || {};
+        const contact = asn['contact-info'] || {};
+        const routes = data.routes || {};
+
+        let html = `
+            <div class="detail-header">
+                <h2>${safeJoin(asn['as-name'])} <span style="color:#666; font-size:1rem;">AS${safeJoin(asn['aut-num']).replace(/^AS/i,'')}</span></h2>
+                <div class="meta">
+                    Updated: ${new Date(data.created * 1000).toLocaleString()} | Source: ${safeJoin(asn.source)}
+                </div>
+                <div style="margin-top:8px; font-size:0.9rem; font-family: monospace, monospace; white-space: pre;">
+                    ${(asn.remarks || []).map(r => `<div>${r}</div>`).join('')}
+                </div>
+            </div>
+        `;
+
+        // Contact Info
+        html += `<div class="section-title">Contact Info</div>`;
+        html += `<div class="info-grid">`;
+        
+        const addCard = (label, val, isPgp = false) => {
+            if (!val) return;
+            let content = safeJoin(val);
+            
+            // PGP Logic
+            if (isPgp || label.toLowerCase().includes('fingerprint')) {
+                const short = content.substring(0, 20) + '...';
+                content = `
+                    <div class="pgp-container" onclick="this.classList.toggle('expanded')">
+                        <div class="pgp-short">🔑 ${short} <small>(Show)</small></div>
+                        <div class="pgp-full">${content}</div>
+                    </div>
+                `;
+            }
+
+            html += `<div class="info-card">
+                <div class="info-label">${label}</div>
+                <div class="info-value">${content}</div>
+            </div>`;
+        };
+
+        addCard("Admin-C", asn['admin-c']);
+        addCard("Tech-C", asn['tech-c']);
+        addCard("Maintainer", asn['mnt-by']);
+        
+        if (contact) {
+            addCard("Person", contact.person);
+            addCard("Contact", contact.contact); // Could add mailto: link logic here
+            addCard("PGP Fingerprint", contact['pgp-fingerprint'], true);
+        }
+        html += `</div>`;
+
+        // Routes
+        html += `<div class="section-title">IPv4 Routes (${(routes.ipv4 || []).length})</div>`;
+        html += renderRouteTable(routes.ipv4);
+
+        html += `<div class="section-title">IPv6 Routes (${(routes.ipv6 || []).length})</div>`;
+        html += renderRouteTable(routes.ipv6);
+
+        els.detail.innerHTML = html;
+        els.detail.scrollTop = 0;
+    }
+
+    function renderRouteTable(list) {
+        if (!list || !list.length) return '<p style="color:#999; font-style:italic;">No routes exported.</p>';
+
+        let rows = list.map(r => {
+            const prefix = safeJoin(r.route || r.route6);
+            const desc = safeJoin(r.descr || (r.inetnum ? r.inetnum.descr : ""));
+            const origin = safeJoin(r.origin);
+            const isVisible = r.visible === true;
+            
+            const badgeClass = isVisible ? 'badge-visible' : 'badge-hidden';
+            const badgeText = isVisible ? 'Visible' : 'Invisible';
+
+            return `<tr>
+                <td style="width:80px;"><span class="badge ${badgeClass}">${badgeText}</span></td>
+                <td style="font-family:monospace; font-weight:600;">${prefix}</td>
+                <td>${origin}</td>
+                <td style="color:#555;">${desc}</td>
+            </tr>`;
+        }).join('');
+
+        return `<table>
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Prefix</th>
+                    <th>Origin</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+    }
+</script>
+
+</body>
+</html>
